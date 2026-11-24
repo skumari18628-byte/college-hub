@@ -1,20 +1,8 @@
 import { useState } from "react";
 import { useSite } from "../SiteContext";
-import { FONTS, resizeImage } from "../utils";
-
-function Text({ label, value, onChange, placeholder }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input
-        type="text"
-        value={value || ""}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
+import { FONTS, newId } from "../utils";
+import ImageField from "./ImageField";
+import { Field } from "./AdminFields";
 
 function Color({ label, value, onChange }) {
   return (
@@ -41,16 +29,6 @@ export default function SiteCustomizer() {
     }));
   const changed = JSON.stringify(site) !== JSON.stringify(d);
 
-  async function pickImage(key, file, maxWidth, type) {
-    if (!file) return;
-    try {
-      set(key, await resizeImage(file, maxWidth, 0.75, type));
-      setMsg(null);
-    } catch (e) {
-      setMsg({ text: e.message, ok: false });
-    }
-  }
-
   const nav = d.nav;
   const setNav = (items) => set("nav", items);
   const updateTab = (i, patch) =>
@@ -67,6 +45,36 @@ export default function SiteCustomizer() {
       setNav(nav.filter((_, idx) => idx !== i));
     }
   };
+
+  const secs = d.homeSections;
+  const setSecs = (items) => set("homeSections", items);
+  const updateSec = (i, patch) =>
+    setSecs(secs.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const moveSec = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= secs.length) return;
+    const copy = [...secs];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    setSecs(copy);
+  };
+  const removeSec = (i) => {
+    if (window.confirm("Remove this section from the Home page?")) {
+      setSecs(secs.filter((_, idx) => idx !== i));
+    }
+  };
+  const addSec = () =>
+    setSecs([
+      ...secs,
+      {
+        id: `custom-${newId()}`,
+        custom: true,
+        label: "New section",
+        title: "New section",
+        body: "",
+        image: "",
+        visible: true,
+      },
+    ]);
 
   function publish() {
     const bad = d.nav.find((n) => !n.label.trim() || !n.to.startsWith("/"));
@@ -98,7 +106,8 @@ export default function SiteCustomizer() {
     <div>
       <p className="hint">
         Your edits are kept as a draft. Visitors only see them after you click
-        Publish at the bottom.
+        Publish at the bottom. Pictures are stored in this browser, so keep them
+        small.
       </p>
 
       <h3>Preview</h3>
@@ -142,28 +151,27 @@ export default function SiteCustomizer() {
       </div>
 
       <h3>Identity</h3>
-      <Text label="Website title" value={d.siteTitle} onChange={(v) => set("siteTitle", v)} />
-      <Text label="Logo text (shown when there is no logo image)" value={d.logoText} onChange={(v) => set("logoText", v)} />
-      <label className="field">
-        <span>Logo image (optional, a PNG works best)</span>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => pickImage("logoImage", e.target.files[0], 400, "image/png")}
-        />
-      </label>
-      {d.logoImage && (
-        <>
-          <img className="thumb" src={d.logoImage} alt="Logo preview" />
-          <button className="btn small danger" onClick={() => set("logoImage", "")}>
-            Remove logo image
-          </button>
-        </>
-      )}
-      <Text
+      <Field label="Website title" value={d.siteTitle} onChange={(v) => set("siteTitle", v)} />
+      <Field label="Logo text (shown when there is no logo image)" value={d.logoText} onChange={(v) => set("logoText", v)} />
+      <ImageField
+        label="Logo image (optional, a PNG works best)"
+        value={d.logoImage}
+        onChange={(v) => set("logoImage", v)}
+        maxWidth={400}
+        type="image/png"
+      />
+      <Field
         label="Footer text (leave empty for the default)"
         value={d.footerText}
         onChange={(v) => set("footerText", v)}
+      />
+
+      <h3>College picture (top of the Home page)</h3>
+      <ImageField
+        label="A wide photo of the college works best"
+        value={d.heroImage}
+        onChange={(v) => set("heroImage", v)}
+        maxWidth={1600}
       />
 
       <h3>Colours</h3>
@@ -193,23 +201,47 @@ export default function SiteCustomizer() {
         </select>
       </label>
 
-      <h3>Home page picture</h3>
+      <h3>Home page sections</h3>
       <p className="hint">
-        The big picture at the top of the Home page. A wide photo works best.
+        Show, hide and reorder the sections of the Home page, or add your own
+        section with a title, text and picture.
       </p>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => pickImage("heroImage", e.target.files[0], 1600, "image/jpeg")}
-      />
-      {d.heroImage && (
-        <>
-          <img className="thumb" src={d.heroImage} alt="Home picture preview" style={{ marginTop: 10 }} />
-          <button className="btn small danger" onClick={() => set("heroImage", "")}>
-            Remove picture (use the default)
-          </button>
-        </>
-      )}
+      {secs.map((s, i) => (
+        <div key={s.id} className="list-item nav-row">
+          {s.custom ? (
+            <>
+              <Field label="Section title" value={s.title} onChange={(v) => updateSec(i, { title: v, label: v })} />
+              <Field label="Text" long value={s.body} onChange={(v) => updateSec(i, { body: v })} />
+              <ImageField label="Picture (optional)" value={s.image} maxWidth={900} onChange={(v) => updateSec(i, { image: v })} />
+            </>
+          ) : (
+            <p>
+              <strong>{s.label}</strong>
+            </p>
+          )}
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.visible}
+              onChange={(e) => updateSec(i, { visible: e.target.checked })}
+            />
+            Show this section
+          </label>
+          <div>
+            <button className="btn small" onClick={() => moveSec(i, -1)}>↑ Up</button>{" "}
+            <button className="btn small" onClick={() => moveSec(i, 1)}>↓ Down</button>
+            {s.custom && (
+              <>
+                {" "}
+                <button className="btn small danger" onClick={() => removeSec(i)}>Remove</button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      <button className="btn small" onClick={addSec}>
+        + Add a section
+      </button>
 
       <h3>Navigation tabs</h3>
       <p className="hint">
@@ -219,8 +251,8 @@ export default function SiteCustomizer() {
       </p>
       {nav.map((t, i) => (
         <div key={i} className="list-item nav-row">
-          <Text label="Tab name" value={t.label} onChange={(v) => updateTab(i, { label: v })} />
-          <Text label="Opens (path, e.g. /about)" value={t.to} onChange={(v) => updateTab(i, { to: v })} />
+          <Field label="Tab name" value={t.label} onChange={(v) => updateTab(i, { label: v })} />
+          <Field label="Opens (path, e.g. /about)" value={t.to} onChange={(v) => updateTab(i, { to: v })} />
           <label className="check">
             <input
               type="checkbox"

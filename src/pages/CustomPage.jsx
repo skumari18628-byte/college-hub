@@ -15,6 +15,9 @@ export default function CustomPage() {
         <h1>{page ? page.title : "Page not found"}</h1>
       </section>
       <section className="section">
+        {page && page.image && (
+          <img className="about-img" src={page.image} alt={page.title} />
+        )}
         <div className="about-text">
           {page ? (
             page.body

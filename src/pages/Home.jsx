@@ -17,39 +17,38 @@ const quickLinks = [
 const isSafe = (url) => /^https?:\/\//i.test(url || "");
 
 export default function Home() {
-  const { college, principal, announcements, placements } = useSite();
-  const [photoOk, setPhotoOk] = useState(true);
+  const { site, college, principal, announcements, placements } = useSite();
+  const [failedSrc, setFailedSrc] = useState("");
 
   const ug = programs.filter((p) => p.level === "UG");
   const pg = programs.filter((p) => p.level === "PG");
   const latest = announcements.slice(0, 3);
   const openings = placements.openings.slice(0, 3);
+  const photoSrc = principal.image || "/principal.jpg";
 
-  return (
-    <>
-      <Navbar />
+  const hero = (
+    <section key="hero" className="hero-photo">
+      <p className="eyebrow">Welcome to</p>
+      <h1>{college.name}</h1>
+      <p className="tagline">{college.tagline}</p>
+      <p className="hero-intro">{college.intro}</p>
+      <Link className="btn" to="/login">
+        Login to your portal
+      </Link>
+    </section>
+  );
 
-      {/* 1. College picture and welcome */}
-      <section className="hero-photo">
-        <p className="eyebrow">Welcome to</p>
-        <h1>{college.name}</h1>
-        <p className="tagline">{college.tagline}</p>
-        <p className="hero-intro">{college.intro}</p>
-        <Link className="btn" to="/login">
-          Login to your portal
-        </Link>
-      </section>
-
-      {/* 2. Principal */}
-      <section className="section">
+  const blocks = {
+    principal: (cls) => (
+      <section key="principal" className={cls}>
         <h2>From the Principal</h2>
         <div className="principal">
           <div className="principal-photo">
-            {photoOk ? (
+            {failedSrc !== photoSrc ? (
               <img
-                src="/principal.jpg"
+                src={photoSrc}
                 alt={principal.name}
-                onError={() => setPhotoOk(false)}
+                onError={() => setFailedSrc(photoSrc)}
               />
             ) : (
               <span>Photo</span>
@@ -62,9 +61,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+    ),
 
-      {/* 3. About the college */}
-      <section className="section dark">
+    about: (cls) => (
+      <section key="about" className={cls}>
         <h2>About the College</h2>
         <p className="lead">{college.about}</p>
         <div className="stats">
@@ -79,9 +79,10 @@ export default function Home() {
           Read more
         </Link>
       </section>
+    ),
 
-      {/* 4. Quick access */}
-      <section className="section">
+    quick: (cls) => (
+      <section key="quick" className={cls}>
         <h2>Quick Access</h2>
         <div className="grid">
           {quickLinks.map((q) => (
@@ -93,9 +94,10 @@ export default function Home() {
           ))}
         </div>
       </section>
+    ),
 
-      {/* 5. Academic programmes */}
-      <section className="section dark">
+    programmes: (cls) => (
+      <section key="programmes" className={cls}>
         <h2>Academic Programmes</h2>
         <h3 className="sem-heading">Undergraduate (UG)</h3>
         <div className="chip-row">
@@ -117,9 +119,10 @@ export default function Home() {
           View all programmes
         </Link>
       </section>
+    ),
 
-      {/* 6. Latest announcements */}
-      <section className="section">
+    announcements: (cls) => (
+      <section key="announcements" className={cls}>
         <h2>Latest Announcements</h2>
         {latest.length === 0 ? (
           <p className="empty">No announcements right now.</p>
@@ -137,9 +140,10 @@ export default function Home() {
           All announcements
         </Link>
       </section>
+    ),
 
-      {/* 7. Placement opportunities */}
-      <section className="section dark">
+    placements: (cls) => (
+      <section key="placements" className={cls}>
         <h2>Placement Opportunities</h2>
         {openings.length === 0 ? (
           <p className="empty">
@@ -166,22 +170,25 @@ export default function Home() {
           Go to Placements
         </Link>
       </section>
+    ),
 
-      {/* 8. Campus highlights */}
-      <section className="section">
+    highlights: (cls) => (
+      <section key="highlights" className={cls}>
         <h2>Campus Highlights</h2>
         <div className="grid">
           {college.facilities.slice(0, 6).map((f, i) => (
             <div key={i} className="card">
+              {f.image && <img className="card-img" src={f.image} alt={f.title} />}
               <h3>{f.title}</h3>
               <p>{f.text}</p>
             </div>
           ))}
         </div>
       </section>
+    ),
 
-      {/* 9. Contact information */}
-      <section className="section dark">
+    contact: (cls) => (
+      <section key="contact" className={cls}>
         <h2>Contact Us</h2>
         <div className="contact-lines">
           <p>📍 {college.address}</p>
@@ -192,7 +199,37 @@ export default function Home() {
           Contact page
         </Link>
       </section>
+    ),
+  };
 
+  let n = 0;
+
+  return (
+    <>
+      <Navbar />
+      {site.homeSections
+        .filter((s) => s.visible)
+        .map((s) => {
+          if (s.id === "hero") return hero;
+          const cls = n++ % 2 === 0 ? "section" : "section dark";
+          if (s.custom) {
+            return (
+              <section key={s.id} className={cls}>
+                {s.title && <h2>{s.title}</h2>}
+                {s.image && <img className="section-img" src={s.image} alt={s.title} />}
+                {(s.body || "")
+                  .split("\n")
+                  .filter((l) => l.trim())
+                  .map((l, i) => (
+                    <p key={i} className="lead">
+                      {l}
+                    </p>
+                  ))}
+              </section>
+            );
+          }
+          return blocks[s.id] ? blocks[s.id](cls) : null;
+        })}
       <Footer />
     </>
   );

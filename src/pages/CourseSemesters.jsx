@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { useSite } from "../SiteContext";
 import { programs } from "../subjectsData";
 
 export default function CourseSemesters({ base = "academics", showInfo = true }) {
   const { courseId } = useParams();
+  const { faculty } = useSite();
   const [semester, setSemester] = useState(1);
   const program = programs.find((p) => p.id === courseId);
 
@@ -26,6 +28,15 @@ export default function CourseSemesters({ base = "academics", showInfo = true })
 
   const semesterNumbers = Array.from({ length: program.semesters }, (_, i) => i + 1);
   const subjects = program.subjects[semester] || [];
+  const courseSubjectIds = Object.values(program.subjects)
+    .flat()
+    .map((s) => s.id);
+  const courseFaculty = faculty.filter(
+    (f) =>
+      f.status !== "Inactive" &&
+      ((f.courses || []).includes(program.id) ||
+        (f.subjects || []).some((id) => courseSubjectIds.includes(id)))
+  );
   const backLink = (
     <Link className="back-link-inline" to={`/${base}`}>
       ← All courses
@@ -44,6 +55,9 @@ export default function CourseSemesters({ base = "academics", showInfo = true })
         <section className="section">
           {backLink}
           <h2>About the Course</h2>
+          {program.image && (
+            <img className="course-img" src={program.image} alt={program.name} />
+          )}
           <p className="lead">{program.description}</p>
           <div className="facts">
             <div className="fact">
@@ -105,17 +119,33 @@ export default function CourseSemesters({ base = "academics", showInfo = true })
           <section className="section">
             <h2>Career Opportunities</h2>
             <ul className="career-list">
-              {program.careers.map((c, i) => (
-                <li key={i}>{c}</li>
-              ))}
+              {(program.careers || [])
+                .filter((c) => c.trim())
+                .map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
             </ul>
           </section>
 
           <section className="section dark">
             <h2>Faculty</h2>
-            <p className="lead">
-              Faculty details for this course will be published here by the Admin.
-            </p>
+            {courseFaculty.length === 0 ? (
+              <p className="lead">
+                Faculty details for this course will be published here soon.
+              </p>
+            ) : (
+              <div className="grid">
+                {courseFaculty.map((f) => (
+                  <div key={f.id} className="card faculty-card">
+                    {f.photo && <img className="face" src={f.photo} alt={f.name} />}
+                    <h3>{f.name}</h3>
+                    <p>{f.designation}</p>
+                    <p>{f.department}</p>
+                    {f.email && <p>✉️ {f.email}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </>
       )}

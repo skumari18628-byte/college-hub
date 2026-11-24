@@ -24,9 +24,6 @@ const STATUS_LABEL = {
   approved: "Approved",
   rejected: "Rejected",
 };
-const programsWithSubjects = programs.filter(
-  (p) => Object.keys(p.subjects).length > 0
-);
 
 function Input({ label, value, onChange }) {
   return (
@@ -40,9 +37,9 @@ function Input({ label, value, onChange }) {
 export default function FacultyDashboard() {
   const { allMaterials, announcements, facultyProfile: fp, setContent } = useSite();
   const [tab, setTab] = useState("profile");
-  const [programId, setProgramId] = useState(programsWithSubjects[0].id);
+  const [programId, setProgramId] = useState("");
   const [semester, setSemester] = useState(1);
-  const [subjectId, setSubjectId] = useState(programsWithSubjects[0].subjects[1][0].id);
+  const [subjectId, setSubjectId] = useState("");
   const [type, setType] = useState("Notes");
   const [category, setCategory] = useState(CATEGORIES["Notes"][0]);
   const [title, setTitle] = useState("");
@@ -55,8 +52,32 @@ export default function FacultyDashboard() {
     return <Navigate to="/faculty-login" replace />;
   }
 
-  const program = programs.find((p) => p.id === programId);
+  const programsWithSubjects = programs.filter((p) =>
+    Object.values(p.subjects || {}).some((l) => l.length > 0)
+  );
+  const program =
+    programsWithSubjects.find((p) => p.id === programId) || programsWithSubjects[0];
+
+  if (!program) {
+    return (
+      <>
+        <PortalHeader title="Faculty Portal" sessionKey="facultyLoggedIn" />
+        <main className="section">
+          <p className="empty">
+            No courses with subjects exist yet. Ask the Admin to add them.
+          </p>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   const subjectList = program.subjects[semester] || [];
+  const chosenId = subjectList.some((s) => s.id === subjectId)
+    ? subjectId
+    : subjectList[0]
+    ? subjectList[0].id
+    : "";
 
   const setProfile = (key, value) =>
     setContent((prev) => ({
@@ -65,16 +86,14 @@ export default function FacultyDashboard() {
     }));
 
   function changeProgram(id) {
-    const p = programs.find((x) => x.id === id);
     setProgramId(id);
     setSemester(1);
-    setSubjectId((p.subjects[1] || [])[0]?.id || "");
+    setSubjectId("");
   }
 
   function changeSemester(value) {
-    const n = Number(value);
-    setSemester(n);
-    setSubjectId((program.subjects[n] || [])[0]?.id || "");
+    setSemester(Number(value));
+    setSubjectId("");
   }
 
   function changeType(t) {
@@ -83,12 +102,12 @@ export default function FacultyDashboard() {
   }
 
   function addAssigned() {
-    if (!subjectId || fp.assigned.includes(subjectId)) return;
-    setProfile("assigned", [...fp.assigned, subjectId]);
+    if (!chosenId || fp.assigned.includes(chosenId)) return;
+    setProfile("assigned", [...fp.assigned, chosenId]);
   }
 
   function addMaterial() {
-    if (!subjectId) {
+    if (!chosenId) {
       setStatus({ text: "This semester has no subjects yet.", ok: false });
       return;
     }
@@ -106,7 +125,7 @@ export default function FacultyDashboard() {
         ...prev.materials,
         {
           id: newId(),
-          subjectId,
+          subjectId: chosenId,
           type,
           category,
           title: title.trim(),
@@ -155,7 +174,7 @@ export default function FacultyDashboard() {
     <>
       <label className="field">
         <span>Course</span>
-        <select value={programId} onChange={(e) => changeProgram(e.target.value)}>
+        <select value={program.id} onChange={(e) => changeProgram(e.target.value)}>
           {programsWithSubjects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name} - {p.full}
@@ -175,7 +194,7 @@ export default function FacultyDashboard() {
       </label>
       <label className="field">
         <span>Subject</span>
-        <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+        <select value={chosenId} onChange={(e) => setSubjectId(e.target.value)}>
           {subjectList.length === 0 && <option value="">No subjects yet</option>}
           {subjectList.map((s) => (
             <option key={s.id} value={s.id}>

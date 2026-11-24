@@ -4,59 +4,13 @@ import { useSite } from "../SiteContext";
 import SiteCustomizer from "../components/SiteCustomizer";
 import ChangeHistory from "../components/ChangeHistory";
 import FeedbackManager from "../components/FeedbackManager";
+import FacultyManager from "../components/FacultyManager";
+import StudentManager from "../components/StudentManager";
+import CourseManager from "../components/CourseManager";
+import ImageField from "../components/ImageField";
+import { Field, ListEditor } from "../components/AdminFields";
 import { programs, allProgramSubjects, TYPE_LABELS } from "../subjectsData";
 import { ANNOUNCEMENT_CATEGORIES, todayISO, feeTotal } from "../utils";
-
-function Field({ label, value, onChange, long }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {long ? (
-        <textarea rows="5" value={value || ""} onChange={(e) => onChange(e.target.value)} />
-      ) : (
-        <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} />
-      )}
-    </label>
-  );
-}
-
-function ListEditor({ items, fields, onChange, addLabel }) {
-  function update(index, key, value) {
-    onChange(items.map((item, i) => (i === index ? { ...item, [key]: value } : item)));
-  }
-  function remove(index) {
-    onChange(items.filter((_, i) => i !== index));
-  }
-  function add() {
-    const blank = {};
-    fields.forEach((f) => (blank[f.key] = ""));
-    onChange([...items, blank]);
-  }
-
-  return (
-    <div>
-      {items.map((item, i) => (
-        <div key={i} className="list-item">
-          {fields.map((f) => (
-            <Field
-              key={f.key}
-              label={f.label}
-              long={f.long}
-              value={item[f.key]}
-              onChange={(v) => update(i, f.key, v)}
-            />
-          ))}
-          <button className="btn small danger" onClick={() => remove(i)}>
-            Remove
-          </button>
-        </div>
-      ))}
-      <button className="btn small" onClick={add}>
-        + {addLabel}
-      </button>
-    </div>
-  );
-}
 
 function AnnouncementEditor({ items, onChange }) {
   const update = (i, key, value) =>
@@ -232,7 +186,7 @@ function FeeEditor({ fees, onChange }) {
     onChange([
       ...fees,
       {
-        courseId: filter === "all" ? programs[0].id : filter,
+        courseId: filter === "all" ? (programs[0] ? programs[0].id : "") : filter,
         semester: "1",
         academicYear: "",
         tuition: "",
@@ -286,7 +240,7 @@ function FeeEditor({ fees, onChange }) {
             <label className="field">
               <span>Semester</span>
               <select value={f.semester} onChange={(e) => update(i, "semester", e.target.value)}>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                   <option key={n} value={String(n)}>
                     Semester {n}
                   </option>
@@ -329,11 +283,14 @@ function FeeEditor({ fees, onChange }) {
 
 const sections = [
   { id: "overview", label: "Overview" },
-  { id: "website", label: "Website customization (logo, colours, tabs, images)" },
+  { id: "website", label: "Website customization (logo, colours, tabs, home sections)" },
   { id: "history", label: "Change history" },
+  { id: "courses", label: "Courses, semesters and subjects" },
+  { id: "faculty", label: "Faculty management" },
+  { id: "students", label: "Student management" },
   { id: "home", label: "Home page: college name and welcome" },
-  { id: "principal", label: "Principal" },
-  { id: "about", label: "About page" },
+  { id: "principal", label: "Principal (with photo)" },
+  { id: "about", label: "About page (with pictures)" },
   { id: "announcements", label: "Announcements" },
   { id: "calendar", label: "Academic calendar" },
   { id: "fees", label: "Fee structure" },
@@ -358,6 +315,8 @@ export default function AdminDashboard() {
     fees,
     placements,
     allMaterials,
+    faculty,
+    students,
     setContent,
     resetContent,
   } = useSite();
@@ -382,9 +341,12 @@ export default function AdminDashboard() {
 
   const pending = allMaterials.filter((m) => m.status === "pending").length;
   const newFeedback = feedback.filter((f) => (f.status || "New") === "New").length;
-  const titleText = [
+  const activeFaculty = faculty.filter((f) => f.status !== "Inactive").length;
+  const activeStudents = students.filter((s) => s.status !== "Inactive").length;
+  const cardFields = [
     { key: "title", label: "Title" },
     { key: "text", label: "Text", long: true },
+    { key: "image", label: "Picture (optional)", image: true },
   ];
 
   function logout() {
@@ -419,7 +381,8 @@ export default function AdminDashboard() {
         <h2>Manage Website</h2>
         <p className="lead">
           Choose what you want to change or add. Content changes save
-          automatically. Website customization needs Publish.
+          automatically. Website customization needs Publish. Pictures are kept
+          in this browser, so keep them small.
         </p>
 
         <label className="field" style={{ maxWidth: 500, marginTop: 20 }}>
@@ -441,6 +404,8 @@ export default function AdminDashboard() {
               <h3>Overview</h3>
               <div className="facts">
                 {[
+                  ["Students", `${activeStudents} active of ${students.length}`],
+                  ["Faculty", `${activeFaculty} active of ${faculty.length}`],
                   ["Courses", programs.length],
                   ["Uploaded resources", allMaterials.length],
                   ["Pending approvals", pending],
@@ -456,10 +421,6 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-              <p className="hint">
-                Student and faculty totals will appear once the backend is
-                connected.
-              </p>
             </>
           )}
 
@@ -477,9 +438,34 @@ export default function AdminDashboard() {
             </>
           )}
 
+          {section === "courses" && (
+            <>
+              <h3>Courses, semesters and subjects</h3>
+              <CourseManager />
+            </>
+          )}
+
+          {section === "faculty" && (
+            <>
+              <h3>Faculty management</h3>
+              <FacultyManager />
+            </>
+          )}
+
+          {section === "students" && (
+            <>
+              <h3>Student management</h3>
+              <StudentManager />
+            </>
+          )}
+
           {section === "home" && (
             <>
               <h3>Home page</h3>
+              <p className="hint">
+                To change the big college picture, logo, colours or the order of
+                Home page sections, use "Website customization".
+              </p>
               <Field label="College name" value={college.name} onChange={(v) => setCollege("name", v)} />
               <Field label="Tagline" value={college.tagline} onChange={(v) => setCollege("tagline", v)} />
               <Field label="Welcome text" long value={college.intro} onChange={(v) => setCollege("intro", v)} />
@@ -489,6 +475,12 @@ export default function AdminDashboard() {
           {section === "principal" && (
             <>
               <h3>Principal</h3>
+              <ImageField
+                label="Principal's photo"
+                value={principal.image}
+                maxWidth={500}
+                onChange={(v) => setPrincipal("image", v)}
+              />
               <Field label="Name" value={principal.name} onChange={(v) => setPrincipal("name", v)} />
               <Field label="Title" value={principal.title} onChange={(v) => setPrincipal("title", v)} />
               <Field label="Message" long value={principal.message} onChange={(v) => setPrincipal("message", v)} />
@@ -498,21 +490,27 @@ export default function AdminDashboard() {
           {section === "about" && (
             <>
               <h3>Our Story</h3>
+              <ImageField
+                label="College picture for the About page"
+                value={college.aboutImage}
+                maxWidth={1000}
+                onChange={(v) => setCollege("aboutImage", v)}
+              />
               <Field label="Introduction" long value={college.about} onChange={(v) => setCollege("about", v)} />
               <Field label="History" long value={college.history} onChange={(v) => setCollege("history", v)} />
               <h3>Vision and Mission</h3>
               <Field label="Vision" long value={college.vision} onChange={(v) => setCollege("vision", v)} />
               <Field label="Mission" long value={college.mission} onChange={(v) => setCollege("mission", v)} />
               <h3>Core Values</h3>
-              <ListEditor items={college.values || []} fields={titleText} onChange={(items) => setCollege("values", items)} addLabel="Add a value" />
+              <ListEditor items={college.values || []} fields={cardFields} onChange={(items) => setCollege("values", items)} addLabel="Add a value" />
               <h3>Infrastructure and Facilities</h3>
-              <ListEditor items={college.facilities || []} fields={titleText} onChange={(items) => setCollege("facilities", items)} addLabel="Add a facility" />
+              <ListEditor items={college.facilities || []} fields={cardFields} onChange={(items) => setCollege("facilities", items)} addLabel="Add a facility" />
               <h3>Achievements</h3>
-              <ListEditor items={college.achievements || []} fields={titleText} onChange={(items) => setCollege("achievements", items)} addLabel="Add an achievement" />
+              <ListEditor items={college.achievements || []} fields={cardFields} onChange={(items) => setCollege("achievements", items)} addLabel="Add an achievement" />
               <h3>Clubs and Committees</h3>
-              <ListEditor items={college.clubs || []} fields={titleText} onChange={(items) => setCollege("clubs", items)} addLabel="Add a club or committee" />
+              <ListEditor items={college.clubs || []} fields={cardFields} onChange={(items) => setCollege("clubs", items)} addLabel="Add a club or committee" />
               <h3>College Activities</h3>
-              <ListEditor items={college.activities || []} fields={titleText} onChange={(items) => setCollege("activities", items)} addLabel="Add an activity" />
+              <ListEditor items={college.activities || []} fields={cardFields} onChange={(items) => setCollege("activities", items)} addLabel="Add an activity" />
               <h3>Numbers</h3>
               <ListEditor
                 items={college.stats || []}
@@ -666,7 +664,11 @@ export default function AdminDashboard() {
               </p>
               <ListEditor
                 items={customPages}
-                fields={[{ key: "title", label: "Page title (shown on the tab)" }, { key: "body", label: "Page text", long: true }]}
+                fields={[
+                  { key: "title", label: "Page title (shown on the tab)" },
+                  { key: "image", label: "Picture (optional)", image: true },
+                  { key: "body", label: "Page text", long: true },
+                ]}
                 onChange={(items) => setList("customPages", items)}
                 addLabel="Add a new page"
               />

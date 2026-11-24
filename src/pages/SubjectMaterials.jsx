@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PdfViewer from "../components/PdfViewer";
 import { useSite } from "../SiteContext";
 import { programs, CATEGORIES, TYPE_LABELS } from "../subjectsData";
-import { matKey } from "../utils";
+import { matKey, youtubeEmbed, toDownloadUrl } from "../utils";
 
 const OPTIONS = [
   { type: "Notes", icon: "📘", hint: "PDFs, unit-wise notes, PPTs, assignments, practical notes" },
@@ -12,17 +13,13 @@ const OPTIONS = [
   { type: "Videos", icon: "🎬", hint: "Recorded lectures and topic-wise videos" },
 ];
 
-function youtubeEmbed(url) {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
-}
-
 const isSafe = (url) => /^https?:\/\//i.test(url);
 
 export default function SubjectMaterials({ base = "academics" }) {
   const { courseId, subjectId } = useParams();
   const { materials, saved, setContent } = useSite();
   const [type, setType] = useState(null);
+  const [openKey, setOpenKey] = useState(null);
 
   const program = programs.find((p) => p.id === courseId);
   const subject = program
@@ -43,7 +40,24 @@ export default function SubjectMaterials({ base = "academics" }) {
     }));
   }
 
-  function logOpen(m) {
+  function logViewed(m) {
+    const k = matKey(m);
+    setContent((prev) => ({
+      ...prev,
+      recentlyViewed: [
+        {
+          key: k,
+          title: m.title,
+          subjectId: m.subjectId,
+          type: m.type,
+          date: new Date().toLocaleString("en-IN"),
+        },
+        ...prev.recentlyViewed.filter((x) => x.key !== k),
+      ].slice(0, 10),
+    }));
+  }
+
+  function logDownload(m) {
     setContent((prev) => ({
       ...prev,
       downloadLog: [
@@ -57,6 +71,16 @@ export default function SubjectMaterials({ base = "academics" }) {
         ...prev.downloadLog,
       ].slice(0, 50),
     }));
+  }
+
+  function toggleOpen(m) {
+    const k = matKey(m);
+    if (openKey === k) {
+      setOpenKey(null);
+    } else {
+      setOpenKey(k);
+      logViewed(m);
+    }
   }
 
   if (!program || !subject) {
@@ -109,7 +133,10 @@ export default function SubjectMaterials({ base = "academics" }) {
               <button
                 key={o.type}
                 className={type === o.type ? "card option active" : "card option"}
-                onClick={() => setType(o.type)}
+                onClick={() => {
+                  setType(o.type);
+                  setOpenKey(null);
+                }}
               >
                 <span className="option-icon">{o.icon}</span>
                 <span className="option-title">{TYPE_LABELS[o.type]}</span>
@@ -135,35 +162,74 @@ export default function SubjectMaterials({ base = "academics" }) {
                   <h3>{g.cat}</h3>
                   <ul className="material-list">
                     {g.list.map((m, i) => {
-                      const embed = type === "Videos" ? youtubeEmbed(m.link) : null;
+                      const k = matKey(m);
+                      const isVideo = type === "Videos";
+                      const embed = isVideo ? youtubeEmbed(m.link) : null;
+                      const open = openKey === k;
                       return (
                         <li key={i} style={{ display: "block" }}>
                           <div className="material-row">
                             <span>{m.title}</span>
                             <span>
-                              {isSafe(m.link) && !embed && (
-                                <a
-                                  className="btn small"
-                                  href={m.link}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={() => logOpen(m)}
-                                >
-                                  {type === "Videos" ? "Watch" : "Open / Download"}
-                                </a>
+                              {isVideo ? (
+                                embed ? (
+                                  <button className="btn small" onClick={() => toggleOpen(m)}>
+                                    {open ? "Hide video" : "▶ Watch"}
+                                  </button>
+                                ) : (
+                                  isSafe(m.link) && (
+                                    <a
+                                      className="btn small"
+                                      href={m.link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => logViewed(m)}
+                                    >
+                                      Watch
+                                    </a>
+                                  )
+                                )
+                              ) : (
+                                <>
+                                  {isSafe(m.link) && (
+                                    <button className="btn small" onClick={() => toggleOpen(m)}>
+                                      {open ? "Close viewer" : "View"}
+                                    </button>
+                                  )}{" "}
+                                  {isSafe(m.link) && (
+                                    <a
+                                      className="btn small"
+                                      href={toDownloadUrl(m.link)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => logDownload(m)}
+                                    >
+                                      Download
+                                    </a>
+                                  )}
+                                </>
                               )}{" "}
                               <button className="btn small" onClick={() => toggleSave(m)}>
-                                {saved.includes(matKey(m)) ? "★ Saved" : "☆ Save"}
+                                {saved.includes(k) ? "★ Saved" : "☆ Save"}
                               </button>
                             </span>
                           </div>
-                          {embed && (
+
+                          {open && embed && (
                             <iframe
                               className="video-frame"
                               src={embed}
                               title={m.title}
                               allowFullScreen
                               loading="lazy"
+                            />
+                          )}
+                          {open && !isVideo && isSafe(m.link) && (
+                            <PdfViewer
+                              item={m}
+                              saved={saved.includes(k)}
+                              onToggleSave={() => toggleSave(m)}
+                              onDownload={() => logDownload(m)}
                             />
                           )}
                         </li>

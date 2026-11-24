@@ -9,6 +9,7 @@ function CardGrid({ items, empty }) {
     <div className="grid">
       {items.map((it, i) => (
         <div key={i} className="card">
+          {it.image && <img className="card-img" src={it.image} alt={it.title} />}
           <h3>{it.title}</h3>
           <p>{it.text}</p>
         </div>
@@ -31,6 +32,9 @@ export default function About() {
 
       <section className="section">
         <h2>Our Story</h2>
+        {college.aboutImage && (
+          <img className="about-img" src={college.aboutImage} alt={college.name} />
+        )}
         <div className="about-text">
           <p className="lead">{college.about}</p>
           <p>{college.history}</p>

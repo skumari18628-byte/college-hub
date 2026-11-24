@@ -1,16 +1,40 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
 import * as defaults from "./collegeData";
+import { programs, allProgramSubjects } from "./subjectsData";
+import { defaultPrograms } from "./defaultCurriculum";
 import {
   isApproved,
   isLive,
   newId,
   FONTS,
   IMAGE_KEYS,
+  RESTORE_SKIP,
   SITE_FIELDS,
+  DEFAULT_HOME_SECTIONS,
 } from "./utils";
 
 const STORAGE_KEY = "collegeHubContent";
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// Makes the whole site use the courses and subjects chosen in the Admin
+function applyCurriculum(list) {
+  programs.length = 0;
+  list.forEach((p) => programs.push(p));
+  allProgramSubjects.length = 0;
+  list.forEach((p) =>
+    Object.entries(p.subjects || {}).forEach(([semester, subs]) =>
+      subs.forEach((s) =>
+        allProgramSubjects.push({
+          ...s,
+          semester: Number(semester),
+          programId: p.id,
+          programName: p.name,
+        })
+      )
+    )
+  );
+}
 
 const defaultSite = {
   siteTitle: "College Hub",
@@ -27,6 +51,7 @@ const defaultSite = {
   nav: defaults.navLinks
     .filter((l) => l.to !== "/login")
     .map((l) => ({ ...l, hidden: false })),
+  homeSections: DEFAULT_HOME_SECTIONS,
 };
 
 const defaultContent = {
@@ -42,6 +67,9 @@ const defaultContent = {
   fees: [],
   saved: [],
   downloadLog: [],
+  recentlyViewed: [],
+  faculty: [],
+  students: [],
   placements: defaults.placements,
   studentProfile: { name: "", regNo: "", course: "bca", semester: "1", email: "", phone: "" },
   facultyProfile: { name: "", staffId: "", department: "", designation: "", phone: "", email: "", assigned: [] },
@@ -60,14 +88,22 @@ export function slugify(text) {
     .replace(/^-|-$/g, "");
 }
 
+const display = (obj, k) => {
+  if (k === "homeSections") {
+    return (obj[k] || []).map((s) => ({ label: s.label, hidden: !s.visible }));
+  }
+  if (IMAGE_KEYS.includes(k)) return obj[k] ? "(image)" : "(none)";
+  return obj[k];
+};
+
 function diffSite(a, b) {
   return Object.keys(SITE_FIELDS)
     .filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
     .map((k) => ({
       key: k,
       label: SITE_FIELDS[k],
-      from: IMAGE_KEYS.includes(k) ? (a[k] ? "(image)" : "(none)") : a[k],
-      to: IMAGE_KEYS.includes(k) ? (b[k] ? "(image)" : "(none)") : b[k],
+      from: display(a, k),
+      to: display(b, k),
     }));
 }
 
@@ -85,6 +121,7 @@ export function SiteProvider({ children }) {
           placements: { ...defaultContent.placements, ...saved.placements },
           studentProfile: { ...defaultContent.studentProfile, ...saved.studentProfile },
           facultyProfile: { ...defaultContent.facultyProfile, ...saved.facultyProfile },
+          curriculum: saved.curriculum || clone(defaultPrograms),
           site,
           siteDraft: { ...site, ...saved.siteDraft },
           siteHistory: saved.siteHistory || [],
@@ -93,19 +130,20 @@ export function SiteProvider({ children }) {
     } catch {
       // ignore and use defaults
     }
-    return defaultContent;
+    return { ...defaultContent, curriculum: clone(defaultPrograms) };
   });
 
-  // Save everything in the browser
+  // Courses and subjects chosen in the Admin are used by every page
+  applyCurriculum(content.curriculum);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
     } catch {
-      // ignore
+      // browser storage is full
     }
   }, [content]);
 
-  // Apply the published colours, font, buttons, picture and title
   useEffect(() => {
     const s = content.site;
     const root = document.documentElement.style;
@@ -123,7 +161,7 @@ export function SiteProvider({ children }) {
   }, [content.site, content.college.name]);
 
   function resetContent() {
-    setContent(defaultContent);
+    setContent({ ...defaultContent, curriculum: clone(defaultPrograms) });
   }
 
   function publishSite() {
@@ -155,7 +193,7 @@ export function SiteProvider({ children }) {
       if (!entry) return prev;
       const restored = { ...prev.site };
       entry.changes.forEach((c) => {
-        if (!IMAGE_KEYS.includes(c.key)) restored[c.key] = c.from;
+        if (!RESTORE_SKIP.includes(c.key)) restored[c.key] = c.from;
       });
       const changes = diffSite(prev.site, restored);
       if (changes.length === 0) return prev;
@@ -177,7 +215,6 @@ export function SiteProvider({ children }) {
 
   const value = {
     ...content,
-    // public pages only see live announcements and approved materials
     announcements: content.announcements.filter(isLive),
     allAnnouncements: content.announcements,
     materials: content.materials.filter(isApproved),

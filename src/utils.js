@@ -29,7 +29,6 @@ export const FONTS = {
   friendly: { label: "Friendly sans-serif", css: '"Trebuchet MS", Verdana, sans-serif' },
 };
 
-// Website settings that the Admin can customize (used for change history)
 export const SITE_FIELDS = {
   siteTitle: "Website title",
   logoText: "Logo text",
@@ -43,9 +42,24 @@ export const SITE_FIELDS = {
   font: "Font",
   buttonStyle: "Button style",
   nav: "Navigation tabs",
+  homeSections: "Home page sections",
 };
 
 export const IMAGE_KEYS = ["logoImage", "heroImage"];
+// These are recorded in the history but not brought back by Restore
+export const RESTORE_SKIP = ["logoImage", "heroImage", "homeSections"];
+
+export const DEFAULT_HOME_SECTIONS = [
+  { id: "hero", label: "College picture and welcome", visible: true },
+  { id: "principal", label: "From the Principal", visible: true },
+  { id: "about", label: "About the College", visible: true },
+  { id: "quick", label: "Quick access cards", visible: true },
+  { id: "programmes", label: "Academic programmes", visible: true },
+  { id: "announcements", label: "Latest announcements", visible: true },
+  { id: "placements", label: "Placement opportunities", visible: true },
+  { id: "highlights", label: "Campus highlights", visible: true },
+  { id: "contact", label: "Contact information", visible: true },
+];
 
 export const todayISO = () => {
   const d = new Date();
@@ -57,10 +71,8 @@ export const todayISO = () => {
 export const newId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-// A material is shown to students only when approved
 export const isApproved = (m) => !m.status || m.status === "approved";
 
-// An announcement is shown when published and its schedule date has arrived
 export const isLive = (a) =>
   a.published !== false && (!a.publishOn || a.publishOn <= todayISO());
 
@@ -69,6 +81,21 @@ export const matKey = (m) => m.id || `${m.subjectId}|${m.title}`;
 const num = (v) => Number(v) || 0;
 export const feeTotal = (f) =>
   num(f.tuition) + num(f.admission) + num(f.exam) + num(f.lab) + num(f.other);
+
+export function youtubeEmbed(url) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
+
+export function toPreviewUrl(url) {
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : url;
+}
+
+export function toDownloadUrl(url) {
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/uc?export=download&id=${m[1]}` : url;
+}
 
 // Shrinks an uploaded picture so it fits in browser storage
 export function resizeImage(file, maxWidth = 1600, quality = 0.75, type = "image/jpeg") {
